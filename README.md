@@ -157,14 +157,3 @@ This implementation is designed as a clean baseline.  Future phases may add:
 - Cryptographic computation overhead benchmarking
 - Comparative analysis dashboards
 
-## Technical Notes
-
-- **Timing**: Uses `std::chrono::steady_clock` (monotonic, immune to NTP drift)
-- **Data structures**: `std::vector<int>` for routing tables (cache-friendly O(1)
-  lookups for dense sequential router IDs)
-- **Topology**: Fixed for the duration of each simulation run
-- **C++ Standard**: C++17
-
-## License
-
-Research project — see your institution's licensing requirements.
