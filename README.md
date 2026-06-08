@@ -123,29 +123,6 @@ docker run routing-simulator
 └─────────────────────────────────────┘
 ```
 
-## Extending the Routing Strategy
-
-The routing table generator follows the **strategy pattern**.  To implement
-a custom routing scheme (e.g., privacy-preserving or secret-sharing-based):
-
-```cpp
-#include "RoutingTableGenerator.h"
-
-class MyCustomGenerator : public RoutingTableGenerator {
-public:
-    void generate(std::vector<Router>& routers,
-                  const std::vector<std::vector<int>>& adj) override {
-        // Your custom routing table logic here
-    }
-    std::string name() const override { return "MyCustom"; }
-};
-
-// Usage:
-Simulator sim;
-sim.setRoutingTableGenerator(std::make_unique<MyCustomGenerator>());
-sim.setupNetwork(100, TopologyType::RANDOM);
-```
-
 ## Future Research Extensions
 
 This implementation is designed as a clean baseline.  Future phases may add:
