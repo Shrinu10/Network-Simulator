@@ -1,0 +1,10 @@
+^C:\USERS\SHRIR\DOWNLOADS\NETWORK SIMULATOR\BUILD-WIN\CMAKEFILES\C97F60D297537651258D00605A596462\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/shrir/Downloads/Network Simulator" "-BC:/Users/shrir/Downloads/Network Simulator/build-win" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/shrir/Downloads/Network Simulator/build-win/RoutingSimulator.slnx"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
