@@ -1,72 +1,81 @@
 /**
  * @file main.cpp
- * @brief Network Routing Simulator — demonstration entry point.
+ * @brief Network Routing Simulator -- config-driven entry point.
  *
- * Runs two demos:
- *   1. 20-router random connected graph  — single packet + batch of 100
- *   2. 50-router random connected graph  — single packet + batch of 500
+ * All simulation parameters are read from config.txt.
+ * Users edit config.txt instead of modifying this file.
  *
- * All routers exist as in-process objects.  Routing tables are generated
- * via BFS (pluggable strategy).  Timing measures raw C++ forwarding
- * overhead using std::chrono::steady_clock.
+ * What happens:
+ *   1. Load config.txt  (number of routers, topology, latency, etc.)
+ *   2. Build the network with the chosen topology
+ *   3. Send a single packet (source -> destination)
+ *   4. Run a batch simulation (random src/dst pairs)
+ *   5. Print results
  */
 
 #include <iostream>
+#include <string>
+
+#include "Config.h"
 #include "Simulator.h"
+
+// ─── Convert config strings to enums ────────────────────────────
+
+static TopologyType parseTopology(const std::string& s) {
+    if (s == "RING")   return TopologyType::RING;
+    if (s == "MESH")   return TopologyType::MESH;
+    if (s == "TREE")   return TopologyType::TREE;
+    return TopologyType::RANDOM;  // default
+}
+
+static LogLevel parseLogLevel(const std::string& s) {
+    if (s == "SILENT") return LogLevel::SILENT;
+    if (s == "DEBUG")  return LogLevel::DEBUG;
+    return LogLevel::INFO;  // default
+}
+
+// ─── Main ───────────────────────────────────────────────────────
 
 int main() {
     std::cout << "========================================\n";
-    std::cout << "  Network Routing Simulator v1.0\n";
-    std::cout << "  Baseline Public Routing Network\n";
-    std::cout << "========================================\n\n";
+    std::cout << "  Network Routing Simulator v2.0\n";
+    std::cout << "  Config-Driven Simulation\n";
+    std::cout << "========================================\n";
 
-    // ─────────────────────────────────────────────────────────
-    // Demo 1: Small random topology (20 routers)
-    // ─────────────────────────────────────────────────────────
-    std::cout << "--- Demo 1: Random Topology (20 routers) ---\n\n";
+    // ── 1. Load configuration ───────────────────────────────
+    SimConfig cfg = loadConfig("config.txt");
+    printConfig(cfg);
 
-    Simulator sim1(LogLevel::INFO);
-    sim1.setupNetwork(20, TopologyType::RANDOM);
+    TopologyType topo     = parseTopology(cfg.topologyStr);
+    LogLevel     logLevel = parseLogLevel(cfg.logLevelStr);
 
-    // Single packet: Router 0 -> Router 19
-    auto result1 = sim1.sendPacket(0, 19, "Hello Router 19!");
-    sim1.printResult(result1);
+    // ── 2. Build the simulator ──────────────────────────────
+    Simulator sim(logLevel);
 
-    // Batch test: 100 random source/destination pairs
-    std::cout << "\n--- Batch Simulation (100 packets, 20 routers) ---\n";
-    auto batch1 = sim1.runBatch(100);
-    sim1.printBatchResult(batch1);
+    // Enable simulated link latency if requested
+    if (cfg.simulateLatency) {
+        sim.enableLatency(cfg.latencyMinMs, cfg.latencyMaxMs);
+    }
 
-    // ─────────────────────────────────────────────────────────
-    // Demo 2: Medium random topology (50 routers)
-    // ─────────────────────────────────────────────────────────
-    std::cout << "\n--- Demo 2: Random Topology (50 routers) ---\n\n";
+    sim.setupNetwork(cfg.numRouters, topo, cfg.seed);
 
-    Simulator sim2(LogLevel::SILENT);   // suppress per-hop logs at scale
-    sim2.setupNetwork(50, TopologyType::RANDOM);
+    // ── 3. Single packet test ───────────────────────────────
+    std::cout << "--- Single Packet Test ---\n\n";
 
-    // Single packet: Router 0 -> Router 49
-    auto result2 = sim2.sendPacket(0, 49);
-    sim2.printResult(result2);
+    auto result = sim.sendPacket(cfg.sourceRouter, cfg.destRouter,
+                                 "test_payload");
+    sim.printResult(result);
 
-    // Batch test: 500 random source/destination pairs
-    std::cout << "\n--- Batch Simulation (500 packets, 50 routers) ---\n";
-    auto batch2 = sim2.runBatch(500);
-    sim2.printBatchResult(batch2);
+    // ── 4. Batch simulation ─────────────────────────────────
+    std::cout << "\n--- Batch Simulation (" << cfg.numPackets
+              << " packets, " << cfg.numRouters << " routers) ---\n";
 
-    // ─────────────────────────────────────────────────────────
-    // Demo 3: Ring topology (10 routers) — deterministic path
-    // ─────────────────────────────────────────────────────────
-    std::cout << "\n--- Demo 3: Ring Topology (10 routers) ---\n\n";
+    auto batch = sim.runBatch(cfg.numPackets, cfg.seed);
+    sim.printBatchResult(batch);
 
-    Simulator sim3(LogLevel::INFO);
-    sim3.setupNetwork(10, TopologyType::RING);
-
-    auto result3 = sim3.sendPacket(0, 5, "Ring test");
-    sim3.printResult(result3);
-
+    // ── Done ────────────────────────────────────────────────
     std::cout << "\n========================================\n";
-    std::cout << "  All demos completed successfully.\n";
+    std::cout << "  Simulation completed successfully.\n";
     std::cout << "========================================\n";
 
     return 0;

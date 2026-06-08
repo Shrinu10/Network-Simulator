@@ -42,6 +42,10 @@ void Simulator::setRoutingTableGenerator(
     network.setRoutingTableGenerator(std::move(gen));
 }
 
+void Simulator::enableLatency(double minMs, double maxMs) {
+    network.enableLatency(minMs, maxMs);
+}
+
 int Simulator::getRouterCount() const {
     return network.getRouterCount();
 }
@@ -81,6 +85,7 @@ SimulationResult Simulator::sendPacket(int source, int destination,
     result.path                = std::move(fwdResult.path);
     result.hopCount            = static_cast<int>(result.path.size()) - 1;
     result.latencyMicroseconds = elapsed.count();
+    result.simulatedLatencyMs  = fwdResult.simulatedLatencyMs;
     result.delivered           = fwdResult.delivered;
     result.failureReason       = std::move(fwdResult.failureReason);
 
@@ -100,7 +105,7 @@ SimulationResult Simulator::sendPacket(int source, int destination,
 BatchResult Simulator::runBatch(int numPackets, unsigned int seed) {
     const int n = network.getRouterCount();
     if (n < 2) {
-        return {numPackets, 0, numPackets, 0, 0, 0, 0};
+        return {numPackets, 0, numPackets, 0, 0, 0, 0, 0, 0, 0};
     }
 
     unsigned int effectiveSeed = seed;
@@ -118,9 +123,13 @@ BatchResult Simulator::runBatch(int numPackets, unsigned int seed) {
     batch.minLatencyUs = std::numeric_limits<double>::max();
     batch.maxLatencyUs = 0.0;
     batch.avgHops      = 0.0;
+    batch.avgSimLatencyMs = 0.0;
+    batch.minSimLatencyMs = std::numeric_limits<double>::max();
+    batch.maxSimLatencyMs = 0.0;
 
-    double totalLatency = 0.0;
-    double totalHops    = 0.0;
+    double totalLatency    = 0.0;
+    double totalHops       = 0.0;
+    double totalSimLatency = 0.0;
 
     // Suppress per-hop logs during batch (use SILENT internally)
     LogLevel savedLevel = logLevel;
@@ -137,12 +146,17 @@ BatchResult Simulator::runBatch(int numPackets, unsigned int seed) {
 
         if (result.delivered) {
             ++batch.delivered;
-            totalLatency += result.latencyMicroseconds;
-            totalHops    += result.hopCount;
+            totalLatency    += result.latencyMicroseconds;
+            totalHops       += result.hopCount;
+            totalSimLatency += result.simulatedLatencyMs;
             batch.minLatencyUs = std::min(batch.minLatencyUs,
                                           result.latencyMicroseconds);
             batch.maxLatencyUs = std::max(batch.maxLatencyUs,
                                           result.latencyMicroseconds);
+            batch.minSimLatencyMs = std::min(batch.minSimLatencyMs,
+                                             result.simulatedLatencyMs);
+            batch.maxSimLatencyMs = std::max(batch.maxSimLatencyMs,
+                                             result.simulatedLatencyMs);
         } else {
             ++batch.dropped;
         }
@@ -151,10 +165,12 @@ BatchResult Simulator::runBatch(int numPackets, unsigned int seed) {
     logLevel = savedLevel;  // restore original log level
 
     if (batch.delivered > 0) {
-        batch.avgLatencyUs = totalLatency / batch.delivered;
-        batch.avgHops      = totalHops    / batch.delivered;
+        batch.avgLatencyUs    = totalLatency    / batch.delivered;
+        batch.avgHops         = totalHops       / batch.delivered;
+        batch.avgSimLatencyMs = totalSimLatency / batch.delivered;
     } else {
-        batch.minLatencyUs = 0.0;
+        batch.minLatencyUs    = 0.0;
+        batch.minSimLatencyMs = 0.0;
     }
 
     return batch;
@@ -165,51 +181,63 @@ BatchResult Simulator::runBatch(int numPackets, unsigned int seed) {
 // ═══════════════════════════════════════════════════════════════════
 
 void Simulator::printResult(const SimulationResult& r) const {
-    std::cout << "\n┌─────────────────────────────────────┐\n";
-    std::cout << "│        Simulation Result            │\n";
-    std::cout << "├─────────────────────────────────────┤\n";
+    std::cout << "\n+-------------------------------------+\n";
+    std::cout << "|        Simulation Result            |\n";
+    std::cout << "+-------------------------------------+\n";
 
-    std::cout << "│  Source:       Router " << r.source << "\n";
-    std::cout << "│  Destination:  Router " << r.destination << "\n";
-    std::cout << "│  Path:         ";
+    std::cout << "|  Source:       Router " << r.source << "\n";
+    std::cout << "|  Destination:  Router " << r.destination << "\n";
+    std::cout << "|  Path:         ";
     for (size_t i = 0; i < r.path.size(); ++i) {
         if (i > 0) std::cout << " -> ";
         std::cout << r.path[i];
     }
     std::cout << "\n";
 
-    std::cout << "│  Hop Count:    " << r.hopCount << "\n";
+    std::cout << "|  Hop Count:    " << r.hopCount << "\n";
     std::cout << std::fixed << std::setprecision(3);
-    std::cout << "│  Latency:      " << r.latencyMicroseconds << " µs\n";
-    std::cout << "│  Status:       "
-              << (r.delivered ? "Delivered ✓" : "DROPPED ✗") << "\n";
+    std::cout << "|  Comp. Time:   " << r.latencyMicroseconds << " us\n";
+    if (r.simulatedLatencyMs > 0.0) {
+        std::cout << "|  Sim. Latency: " << r.simulatedLatencyMs << " ms\n";
+    }
+    std::cout << "|  Status:       "
+              << (r.delivered ? "Delivered [OK]" : "DROPPED [X]") << "\n";
     if (!r.delivered) {
-        std::cout << "│  Reason:       " << r.failureReason << "\n";
+        std::cout << "|  Reason:       " << r.failureReason << "\n";
     }
 
-    std::cout << "└─────────────────────────────────────┘\n";
+    std::cout << "+-------------------------------------+\n";
 }
 
 void Simulator::printBatchResult(const BatchResult& b) const {
-    std::cout << "\n╔═════════════════════════════════════╗\n";
-    std::cout << "║      Batch Simulation Results       ║\n";
-    std::cout << "╠═════════════════════════════════════╣\n";
+    std::cout << "\n+=====================================+\n";
+    std::cout << "|      Batch Simulation Results       |\n";
+    std::cout << "+=====================================+\n";
 
-    std::cout << "║  Total Packets:   " << b.totalPackets << "\n";
-    std::cout << "║  Delivered:       " << b.delivered << "\n";
-    std::cout << "║  Dropped:         " << b.dropped << "\n";
+    std::cout << "|  Total Packets:   " << b.totalPackets << "\n";
+    std::cout << "|  Delivered:       " << b.delivered << "\n";
+    std::cout << "|  Dropped:         " << b.dropped << "\n";
 
     double successRate = (b.totalPackets > 0)
         ? (100.0 * b.delivered / b.totalPackets) : 0.0;
     std::cout << std::fixed << std::setprecision(1);
-    std::cout << "║  Success Rate:    " << successRate << "%\n";
+    std::cout << "|  Success Rate:    " << successRate << "%\n";
 
     std::cout << std::fixed << std::setprecision(3);
-    std::cout << "║  Avg Latency:     " << b.avgLatencyUs << " µs\n";
-    std::cout << "║  Min Latency:     " << b.minLatencyUs << " µs\n";
-    std::cout << "║  Max Latency:     " << b.maxLatencyUs << " µs\n";
-    std::cout << std::fixed << std::setprecision(1);
-    std::cout << "║  Avg Hops:        " << b.avgHops << "\n";
+    std::cout << "|  Avg Comp. Time:  " << b.avgLatencyUs << " us\n";
+    std::cout << "|  Min Comp. Time:  " << b.minLatencyUs << " us\n";
+    std::cout << "|  Max Comp. Time:  " << b.maxLatencyUs << " us\n";
 
-    std::cout << "╚═════════════════════════════════════╝\n";
+    if (b.avgSimLatencyMs > 0.0) {
+        std::cout << "|  --- Simulated Latency ---\n";
+        std::cout << std::fixed << std::setprecision(3);
+        std::cout << "|  Avg Sim. Lat.:   " << b.avgSimLatencyMs << " ms\n";
+        std::cout << "|  Min Sim. Lat.:   " << b.minSimLatencyMs << " ms\n";
+        std::cout << "|  Max Sim. Lat.:   " << b.maxSimLatencyMs << " ms\n";
+    }
+
+    std::cout << std::fixed << std::setprecision(1);
+    std::cout << "|  Avg Hops:        " << b.avgHops << "\n";
+
+    std::cout << "+=====================================+\n";
 }

@@ -25,5 +25,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY --from=builder /app/build/routing_simulator .
+COPY config.txt .
 
 CMD ["./routing_simulator"]

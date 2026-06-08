@@ -1,7 +1,9 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "Packet.h"
@@ -27,6 +29,12 @@ private:
     std::vector<std::vector<int>>    adjacencyList;
     std::unique_ptr<RoutingTableGenerator> routingGenerator;
 
+    // Simulated link latency: key = (min_id, max_id), value = latency in ms
+    std::map<std::pair<int,int>, double> linkLatencies;
+    bool   latencyEnabled = false;
+    double latencyMinMs   = 1.0;
+    double latencyMaxMs   = 10.0;
+
     /// Add a bidirectional link between routers a and b.
     void addLink(int a, int b);
 
@@ -42,9 +50,10 @@ private:
 public:
     /// Result of forwarding a single packet through the network.
     struct ForwardResult {
-        std::vector<int> path;           ///< Ordered list of router IDs visited
-        bool             delivered;      ///< true if packet reached destination
-        std::string      failureReason;  ///< non-empty only on failure
+        std::vector<int> path;              ///< Ordered list of router IDs visited
+        bool             delivered;         ///< true if packet reached destination
+        std::string      failureReason;     ///< non-empty only on failure
+        double           simulatedLatencyMs; ///< accumulated link latency (0 if disabled)
     };
 
     Network();
@@ -64,6 +73,12 @@ public:
     void generateTopology(int numRouters, TopologyType type, unsigned int seed = 0);
 
     /**
+     * @brief Enable simulated link latency with a given range.
+     *        Must be called *before* generateTopology().
+     */
+    void enableLatency(double minMs, double maxMs);
+
+    /**
      * @brief Forward a packet hop-by-hop through the network using routing tables.
      *
      * Pure table-lookup forwarding — no path computation at runtime.
@@ -73,6 +88,10 @@ public:
 
     int getRouterCount() const;
     const Router& getRouter(int id) const;
+    bool isLatencyEnabled() const;
+
+    /// Get the simulated latency of a specific link (0 if disabled).
+    double getLinkLatency(int a, int b) const;
 
     /// Human-readable name for a topology type.
     static std::string topologyName(TopologyType type);

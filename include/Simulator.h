@@ -15,7 +15,8 @@ struct SimulationResult {
     int              destination;
     std::vector<int> path;
     int              hopCount;
-    double           latencyMicroseconds;
+    double           latencyMicroseconds;      // raw computation time
+    double           simulatedLatencyMs;        // accumulated link delay (0 if disabled)
     bool             delivered;
     std::string      failureReason;
 };
@@ -32,6 +33,10 @@ struct BatchResult {
     double minLatencyUs;
     double maxLatencyUs;
     double avgHops;
+    // Simulated latency stats (0 if disabled)
+    double avgSimLatencyMs;
+    double minSimLatencyMs;
+    double maxSimLatencyMs;
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -73,6 +78,12 @@ public:
      *        Must be called *before* setupNetwork().
      */
     void setRoutingTableGenerator(std::unique_ptr<RoutingTableGenerator> gen);
+
+    /**
+     * @brief Enable simulated link latency.
+     *        Must be called *before* setupNetwork().
+     */
+    void enableLatency(double minMs, double maxMs);
 
     /**
      * @brief Send a single packet and measure forwarding time.

@@ -20,6 +20,12 @@ void Network::setRoutingTableGenerator(
     routingGenerator = std::move(gen);
 }
 
+void Network::enableLatency(double minMs, double maxMs) {
+    latencyEnabled = true;
+    latencyMinMs   = minMs;
+    latencyMaxMs   = maxMs;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Link helpers
 // ═══════════════════════════════════════════════════════════════════
@@ -169,12 +175,28 @@ void Network::generateTopology(int numRouters, TopologyType type,
             "this should not happen with the built-in generators");
     }
 
-    // ── Populate routing tables ──────────────────────────────
+    // ── Populate routing tables ──────────────────────────
     std::cout << "[SETUP] Generating routing tables ("
               << routingGenerator->name() << ") for "
               << numRouters << " routers...\n";
 
     routingGenerator->generate(routers, adjacencyList);
+
+    // ── Generate link latencies (if enabled) ─────────────
+    if (latencyEnabled) {
+        std::mt19937 latRng(effectiveSeed + 12345);
+        std::uniform_real_distribution<double> latDist(latencyMinMs, latencyMaxMs);
+        for (int i = 0; i < numRouters; ++i) {
+            for (int nb : adjacencyList[i]) {
+                auto key = std::make_pair(std::min(i, nb), std::max(i, nb));
+                if (linkLatencies.find(key) == linkLatencies.end()) {
+                    linkLatencies[key] = latDist(latRng);
+                }
+            }
+        }
+        std::cout << "[SETUP] Simulated link latencies assigned ("
+                  << latencyMinMs << " ms - " << latencyMaxMs << " ms)\n";
+    }
 
     std::cout << "[SETUP] Topology ready: " << topologyName(type)
               << " with " << numRouters << " routers\n\n";
@@ -187,6 +209,7 @@ void Network::generateTopology(int numRouters, TopologyType type,
 Network::ForwardResult Network::forwardPacket(Packet& packet) const {
     ForwardResult result;
     result.delivered = false;
+    result.simulatedLatencyMs = 0.0;
 
     const int n = static_cast<int>(routers.size());
 
@@ -219,6 +242,11 @@ Network::ForwardResult Network::forwardPacket(Packet& packet) const {
             return result;
         }
 
+        // Accumulate simulated link latency
+        if (latencyEnabled) {
+            result.simulatedLatencyMs += getLinkLatency(current, nextHop);
+        }
+
         --packet.ttl;
         current = nextHop;
         result.path.push_back(current);
@@ -238,6 +266,17 @@ int Network::getRouterCount() const {
 
 const Router& Network::getRouter(int id) const {
     return routers.at(id);
+}
+
+bool Network::isLatencyEnabled() const {
+    return latencyEnabled;
+}
+
+double Network::getLinkLatency(int a, int b) const {
+    if (!latencyEnabled) return 0.0;
+    auto key = std::make_pair(std::min(a, b), std::max(a, b));
+    auto it = linkLatencies.find(key);
+    return (it != linkLatencies.end()) ? it->second : 0.0;
 }
 
 std::string Network::topologyName(TopologyType type) {

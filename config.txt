@@ -1,0 +1,54 @@
+# ========================================================
+#   Network Routing Simulator - Configuration File
+# ========================================================
+#   Edit the values below and run the simulator.
+#   Lines starting with '#' are comments.
+#   Format:  key = value
+# ========================================================
+
+
+# ---- Network Setup ------------------------------------
+
+# Number of routers in the network (1 to any number)
+routers = 150
+
+# Topology type: RANDOM, RING, MESH, TREE
+topology = TREE
+
+
+# ---- Simulation ---------------------------------------
+
+# Number of packets to send in batch simulation
+packets = 100
+
+# Source router for single-packet test (0-based index)
+# Use -1 for first router (0)
+source = 0
+
+# Destination router for single-packet test
+# Use -1 for last router (routers - 1)
+destination = -1
+
+
+# ---- Simulated Link Latency --------------------------
+
+# Enable simulated link latency? (ON / OFF)
+# When ON, each link is assigned a random delay in the range below.
+# When OFF, only raw computation time is measured.
+simulate_latency = ON
+
+# Latency range in milliseconds (used when simulate_latency = ON)
+latency_min_ms = 1.0
+latency_max_ms = 5.0
+
+
+# ---- Output ------------------------------------------
+
+# Log level: SILENT, INFO, DEBUG
+# SILENT = no per-hop logs (best for large networks)
+# INFO   = log each hop (default, good for debugging)
+# DEBUG  = extra detail
+log_level = INFO
+
+# Random seed (0 = non-deterministic, any other value = reproducible)
+seed = 0

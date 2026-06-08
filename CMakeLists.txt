@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)       # No GNU extensions — ensures portability
 # ── Executable ──────────────────────────────────────────────────
 add_executable(routing_simulator
     src/main.cpp
+    src/Config.cpp
     src/Packet.cpp
     src/Router.cpp
     src/RoutingTableGenerator.cpp
