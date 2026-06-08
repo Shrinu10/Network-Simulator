@@ -41,6 +41,8 @@
 
 # Build directories
 build/
+build-win/
+build/
 Build/
 build-*/
 
