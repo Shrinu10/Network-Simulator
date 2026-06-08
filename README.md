@@ -189,28 +189,6 @@ forwarding, the simulator accumulates the latency of each link traversed.
 
 ---
 
-## Extending the Routing Strategy
-
-The routing table generation follows the Strategy pattern:
-
-```cpp
-class MyCustomGenerator : public RoutingTableGenerator {
-public:
-    void generate(std::vector<Router>& routers,
-                  const std::vector<std::vector<int>>& adj) override {
-        // Your custom routing logic here
-    }
-    std::string name() const override { return "CustomScheme"; }
-};
-
-// In main.cpp or your driver:
-Simulator sim;
-sim.setRoutingTableGenerator(std::make_unique<MyCustomGenerator>());
-sim.setupNetwork(100, TopologyType::RANDOM);
-```
-
----
-
 ## Example Output
 
 ### 20 routers, latency OFF:
